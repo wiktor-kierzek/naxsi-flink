@@ -43,18 +43,14 @@ public class NaxsiFlink {
         transportAddresses.add(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 9300));
 
         final SplitStream<Tuple> input = env
-            .addSource(new RMQSource<String>(
+            .addSource(new RMQSource<>(
                 rabbitMqConfig,
                 "naxsi",
                 true,
                 new SimpleStringSchema()
             )).setParallelism(1)
             .map(new ParseLogLine()).setParallelism(2)
-            .split(new OutputSelector<Tuple>() {
-                public Iterable<String> select(Tuple value) {
-                    return Lists.newArrayList(value.getField(0).toString());
-                }
-            });
+            .split((OutputSelector<Tuple>) value -> Lists.newArrayList(value.getField(0).toString()));
 
         final DataStream<Tuple> ex = input.select("exlog");
 
@@ -62,10 +58,8 @@ public class NaxsiFlink {
             .join(ex)
             .where(new GetHashForTuple()).equalTo(new GetHashForTuple())
             .window(TumblingEventTimeWindows.of(Time.seconds(20)))
-            .apply(new JoinFunction<Tuple, Tuple, Tuple>() {
-                public Tuple join(Tuple o, Tuple o2) throws Exception {
-                    return null;
-                }
+            .apply((JoinFunction<Tuple, Tuple, Tuple>) (o, o2) -> {
+                return null; // TODO: Do join
             });
 
 
