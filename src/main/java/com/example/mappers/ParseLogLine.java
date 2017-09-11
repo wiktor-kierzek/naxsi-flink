@@ -1,10 +1,15 @@
 package com.example.mappers;
 
 import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.MapFunction;
 
 import java.io.Serializable;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -15,25 +20,47 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
     private static Pattern IP_REGEX = Pattern.compile("ip=([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})&");
     private static Pattern SERVER_REGEX = Pattern.compile("server=([^&]*)(?=&)");
     private static Pattern URI_REGEX = Pattern.compile("uri=([^&]*)(?=&)");
-    private static Pattern REQUEST_REGEX = Pattern.compile("request:\\s\"([^\",]*)(?=\",\\s)");
+    private static Pattern REQUEST_REGEX = Pattern.compile("request:\\s\\\\\"([^\",]+)");
 
     private static Pattern CONTENT_EXLOG_REGEX = Pattern.compile("content=(.*),\\s?client");
     private static Pattern VARNAME_EXLOG_REGEX = Pattern.compile("var_name=([^&]*)(?=&)");
 
+    private static Pattern FMT_LINE_REGEX = Pattern.compile("NAXSI_FMT:\\s(.+)(?=,\\sclient)");
+
 
     public ParsedLogEntry map(ExtractNaxsiMessage.NaxsiTuple log) throws Exception {
         switch (log.getLog()) {
-            case "fmt": return parseFMT(log.getMessage());
-            case "exlog": return parseEX(log.getMessage());
+            case "fmt": try { return parseFMT(log.getMessage()); } catch (Throwable e) { System.out.println("Could not parse EXLOG: "+log.getMessage()); }
+            case "exlog": try { return parseEX(log.getMessage()); } catch (Throwable e) { System.out.println("Could not parse EXLOG: "+log.getMessage()); }
         }
         return null;
     }
 
-    /*
-    2017/09/09 17:14:50 [error] 16048#0: *3045261 NAXSI_FMT: ip=77.65.91.38&server=naxsi.kierzek.pl&uri=/&total_processed=5&total_blocked=4&zone0=ARGS&id0=1000&var_name0=v&zone1=ARGS&id1=1007&var_name1=v&zone2=ARGS&id2=1015&var_name2=v, client: 77.65.91.38, server: naxsi.kierzek.pl, request: \"GET /?v=32%20UNION%20ALL%20SELECT%20NULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL--%20XwUM HTTP/1.1\", host: \"naxsi.kierzek.pl\"
-     */
     private FMTLog parseFMT(String line) {
+        List<FMTLog.Finding> findings = new LinkedList<>();
 
+        String[] events = getValue(FMT_LINE_REGEX, line).split("&zone");
+        for(int i=1;i<events.length;i++) {
+            String[] eventValues = events[i].split("&");
+
+            findings.add(
+                new FMTLog.Finding(
+                    FMTLog.Finding.TYPE.getType(Integer.parseInt(eventValues[1].split("=")[1])),
+                    eventValues[0].split("=")[1],
+                    eventValues[1].split("=")[1],
+                    eventValues[2].split("=")[1],
+                    null)
+            );
+        }
+
+        return new FMTLog(
+            getValue(IP_REGEX, line),
+            getTimestamp(line),
+            getValue(SERVER_REGEX, line),
+            getValue(URI_REGEX, line),
+            getValue(REQUEST_REGEX, line),
+            findings
+        );
     }
 
     private ExtendedLog parseEX(String line) {
@@ -53,32 +80,61 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
     }
 
     private String getValue(Pattern pattern, String line) {
-        return pattern.matcher(line).group(1);
+        Matcher matcher = pattern.matcher(line);
+        matcher.find();
+        return matcher.group(1);
     }
 
-    @AllArgsConstructor
+    @AllArgsConstructor @Getter
     public abstract static class ParsedLogEntry implements Serializable {
         protected String ip, timestamp, server, uri, request;
     }
 
+    @Getter
     public static class FMTLog extends ParsedLogEntry {
         private List<Finding> findings;
 
-        public FMTLog(String ip, String timestamp, String server, String uri, String request, List<Finding> findings) {
+        FMTLog(String ip, String timestamp, String server, String uri, String request, List<Finding> findings) {
             super(ip, timestamp, server, uri, request);
             this.findings = findings;
         }
 
-        @AllArgsConstructor
+        @AllArgsConstructor @Getter
         public static class Finding {
-            private String zone, id, type, varName;
+
+            public enum TYPE {
+                Error, SQLi, RFI, Traversal, XSS, Evading, Uploads;
+
+                static TYPE getType(int id) {
+                    if(id<1000) {
+                        return Error;
+                    }
+
+                    id = (id-1000) / 100;
+
+                    switch (id) {
+                        case 0: return SQLi;
+                        case 1: return RFI;
+                        case 2: return Traversal;
+                        case 3: return XSS;
+                        case 4: return Evading;
+                        case 5: return Uploads;
+                    }
+                    return Error;
+                }
+            }
+
+            private TYPE type;
+            private String zone, id, varName;
+            @Setter private String content;
         }
     }
 
+    @Getter
     public static class ExtendedLog extends ParsedLogEntry {
         private String varName, content;
 
-        public ExtendedLog(String ip, String timestamp, String server, String uri, String request, String varName, String content) {
+        ExtendedLog(String ip, String timestamp, String server, String uri, String request, String varName, String content) {
             super(ip, timestamp, server, uri, request);
             this.varName = varName;
             this.content = content;
