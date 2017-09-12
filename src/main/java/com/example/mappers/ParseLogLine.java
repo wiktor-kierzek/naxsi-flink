@@ -17,10 +17,11 @@ import java.util.regex.Pattern;
  */
 public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,ParseLogLine.ParsedLogEntry> {
 
+    private static Pattern TIMESTAMP_REGEX = Pattern.compile("([0-9]{4}\\/[0-9]{2}\\/[0-9]{2}\\s[0-9]{2}:[0-9]{2}:[0-9]{2})");
     private static Pattern IP_REGEX = Pattern.compile("ip=([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})&");
     private static Pattern SERVER_REGEX = Pattern.compile("server=([^&]*)(?=&)");
     private static Pattern URI_REGEX = Pattern.compile("uri=([^&]*)(?=&)");
-    private static Pattern REQUEST_REGEX = Pattern.compile("request:\\s\\\\\"([^\",]+)");
+    private static Pattern REQUEST_REGEX = Pattern.compile("request:\\s\\\\?\"([^\",]+)");
 
     private static Pattern CONTENT_EXLOG_REGEX = Pattern.compile("content=(.*),\\s?client");
     private static Pattern VARNAME_EXLOG_REGEX = Pattern.compile("var_name=([^&]*)(?=&)");
@@ -30,8 +31,20 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
 
     public ParsedLogEntry map(ExtractNaxsiMessage.NaxsiTuple log) throws Exception {
         switch (log.getLog()) {
-            case "fmt": try { return parseFMT(log.getMessage()); } catch (Throwable e) { System.out.println("Could not parse EXLOG: "+log.getMessage()); }
-            case "exlog": try { return parseEX(log.getMessage()); } catch (Throwable e) { System.out.println("Could not parse EXLOG: "+log.getMessage()); }
+            case "fmt":
+                try {
+                    return parseFMT(log.getMessage());
+                } catch (Throwable e) {
+                    System.out.println("Could not parse EXLOG: "+log.getMessage());
+                    e.printStackTrace();
+                }
+            case "exlog":
+                try {
+                    return parseEX(log.getMessage());
+                } catch (Throwable e) {
+                    System.out.println("Could not parse EXLOG: "+log.getMessage());
+                    e.printStackTrace();
+                }
         }
         return null;
     }
@@ -55,7 +68,7 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
 
         return new FMTLog(
             getValue(IP_REGEX, line),
-            getTimestamp(line),
+            getValue(TIMESTAMP_REGEX, line),
             getValue(SERVER_REGEX, line),
             getValue(URI_REGEX, line),
             getValue(REQUEST_REGEX, line),
@@ -66,17 +79,13 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
     private ExtendedLog parseEX(String line) {
         return new ExtendedLog(
             getValue(IP_REGEX, line),
-            getTimestamp(line),
+            getValue(TIMESTAMP_REGEX, line),
             getValue(SERVER_REGEX, line),
             getValue(URI_REGEX, line),
             getValue(REQUEST_REGEX, line),
             getValue(VARNAME_EXLOG_REGEX, line),
             getValue(CONTENT_EXLOG_REGEX, line)
         );
-    }
-
-    private String getTimestamp(String line) {
-        return line.substring(0, 19);
     }
 
     private String getValue(Pattern pattern, String line) {

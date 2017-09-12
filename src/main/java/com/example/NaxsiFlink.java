@@ -4,18 +4,11 @@ import com.example.joins.SetContentInFindings;
 import com.example.mappers.ExtractNaxsiMessage;
 import com.example.mappers.ParseLogLine;
 import com.example.mappers.ToJson;
-import com.google.gson.Gson;
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.flink.api.common.functions.CoGroupFunction;
-import org.apache.flink.api.common.functions.JoinFunction;
-import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.api.common.typeinfo.TypeHint;
+import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.api.java.operators.DataSink;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.hadoop.shaded.com.google.common.collect.Lists;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
@@ -24,22 +17,16 @@ import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeWindows;
-import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.connectors.elasticsearch.ElasticsearchSinkFunction;
-import org.apache.flink.streaming.connectors.elasticsearch.RequestIndexer;
 import org.apache.flink.streaming.connectors.elasticsearch5.ElasticsearchSink;
 import org.apache.flink.streaming.connectors.rabbitmq.RMQSource;
 import org.apache.flink.streaming.connectors.rabbitmq.common.RMQConnectionConfig;
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema;
-import org.apache.flink.util.Collector;
 import org.elasticsearch.client.Requests;
 
-import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -59,11 +46,11 @@ public class NaxsiFlink {
             .setUri("amqp://flink:uGPxSmAWRuu5AtSx@51.255.199.51:5672").build();
 
         Map<String, String> elasticConfig = new HashMap<>();
-        elasticConfig.put("cluster.name", "elastic");
+        elasticConfig.put("cluster.name", "elasticsearch");
         elasticConfig.put("bulk.flush.max.actions", "1");
 
         List<InetSocketAddress> transportAddresses = new ArrayList<>();
-        transportAddresses.add(new InetSocketAddress(InetAddress.getByName("51.255.199.51"), 9300));
+        transportAddresses.add(new InetSocketAddress(InetAddress.getByName("51.254.142.16"), 9300));
 
         SplitStream<ExtractNaxsiMessage.NaxsiTuple> input = env
             .addSource(new RMQSource<>(
@@ -76,10 +63,14 @@ public class NaxsiFlink {
             .split((OutputSelector<ExtractNaxsiMessage.NaxsiTuple>) value -> Lists.newArrayList(value.getLog()));
 
         DataStream<ParseLogLine.ParsedLogEntry> exlogStream =
-            input.select("exlog").map(new ParseLogLine());
+            input.select("exlog")
+                    .map(new ParseLogLine())
+                    .filter(naxsiTuple -> naxsiTuple != null);
 
         DataStream<ParseLogLine.ParsedLogEntry> fmtStream =
-            input.select("fmt").map(new ParseLogLine());
+            input.select("fmt")
+                    .map(new ParseLogLine())
+                    .filter(naxsiTuple -> naxsiTuple != null);
 
 
         DataStreamSink<String> joinedStreams =
@@ -89,23 +80,19 @@ public class NaxsiFlink {
                 .apply(new SetContentInFindings())
             .map(new ToJson())
             .addSink(new ElasticsearchSink<>(elasticConfig, transportAddresses,
-                (ElasticsearchSinkFunction<String>) (element, ctx, indexer) ->
-                    indexer.add(Requests.indexRequest()
-                        .index("naxsi-events")
-                        .type("event")
-                        .source(element)
-            ))).setParallelism(2);
+                    (ElasticsearchSinkFunction<String>) (element, ctx, indexer) ->
+                            indexer.add(Requests.indexRequest()
+                                            .index("naxsi-events")
+                                            .type("event")
+                                            .source(element)
+                            ))).setParallelism(2);
 
         env.execute("Naxsi example");
     }
 
     public static class GetHashForTuple implements KeySelector<ParseLogLine.ParsedLogEntry, String> {
         public String getKey(ParseLogLine.ParsedLogEntry tuple) throws Exception {
-            return DigestUtils.md5Hex(new StringBuilder()
-                .append(tuple.getTimestamp())
-                .append(tuple.getIp())
-                .append(tuple.getUri())
-                .toString()
+            return DigestUtils.md5Hex(tuple.getTimestamp() + tuple.getIp() + tuple.getUri()
             );
         }
     }

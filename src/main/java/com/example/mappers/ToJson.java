@@ -9,7 +9,11 @@ import java.util.Map;
 
 public class ToJson implements MapFunction<ParseLogLine.FMTLog, String> {
 
-    private Gson parser;
+    private static Gson parser;
+
+    static {
+        parser = new Gson();
+    }
 
     @Override
     public String map(ParseLogLine.FMTLog entry) throws Exception {
@@ -28,7 +32,7 @@ public class ToJson implements MapFunction<ParseLogLine.FMTLog, String> {
             jsonFinding.addProperty("id", finding.getId());
             jsonFinding.addProperty("zone", finding.getZone());
             jsonFinding.addProperty("var_name", finding.getVarName());
-            json.addProperty("content", finding.getContent());
+            jsonFinding.addProperty("content", finding.getContent());
 
             jsonFindings.add(jsonFinding);
         }
