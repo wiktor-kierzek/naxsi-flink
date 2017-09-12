@@ -5,6 +5,7 @@ import lombok.Getter;
 import org.apache.flink.api.common.functions.MapFunction;
 
 import java.io.Serializable;
+import java.util.regex.Pattern;
 
 /**
  * Created by _sn on 10.09.2017.

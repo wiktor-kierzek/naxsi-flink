@@ -6,7 +6,6 @@ import com.example.mappers.ParseLogLine;
 import com.example.mappers.ToJson;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.hadoop.shaded.com.google.common.collect.Lists;
@@ -64,12 +63,12 @@ public class NaxsiFlink {
 
         DataStream<ParseLogLine.ParsedLogEntry> exlogStream =
             input.select("exlog")
-                    .map(new ParseLogLine());
+                .map(new ParseLogLine());
 
 
         DataStream<ParseLogLine.ParsedLogEntry> fmtStream =
             input.select("fmt")
-                    .map(new ParseLogLine());
+                .map(new ParseLogLine());
 
 
         DataStreamSink<String> joinedStreams =
@@ -86,12 +85,12 @@ public class NaxsiFlink {
                                             .source(element)
                             ))).setParallelism(2);
 
-        env.execute("Naxsi example");
+        env.execute("Naxsi");
     }
 
     public static class GetHashForTuple implements KeySelector<ParseLogLine.ParsedLogEntry, String> {
         public String getKey(ParseLogLine.ParsedLogEntry tuple) throws Exception {
-            return DigestUtils.md5Hex(tuple.getTimestamp() + tuple.getIp() + tuple.getRequest()
+            return tuple == null ? "" : DigestUtils.md5Hex(tuple.getTimestamp() + tuple.getIp() + tuple.getRequest()
             );
         }
     }

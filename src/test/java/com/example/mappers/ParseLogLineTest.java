@@ -11,15 +11,13 @@ import static org.testng.Assert.*;
  */
 public class ParseLogLineTest {
 
-    private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-
     @Test
     public void testFMT_1() throws Exception {
         String log = "2017/09/09 17:14:50 [error] 16048#0: *3045261 NAXSI_FMT: ip=77.65.91.38&server=naxsi.kierzek.pl&uri=/&total_processed=5&total_blocked=4&zone0=ARGS&id0=1000&var_name0=v&zone1=ARGS&id1=1007&var_name1=v&zone2=ARGS&id2=1015&var_name2=v, client: 77.65.91.38, server: naxsi.kierzek.pl, request: \\\"GET /?v=32%20UNION%20ALL%20SELECT%20NULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL--%20XwUM HTTP/1.1\\\", host: \\\"naxsi.kierzek.pl\\\"";
 
         ParseLogLine.FMTLog parsed = (ParseLogLine.FMTLog) new ParseLogLine().map(new ExtractNaxsiMessage.NaxsiTuple("fmt", log));
 
-        assertEquals(parsed.getTimestamp(), sdf.parse("2017/09/09 17:14:50"));
+        assertEquals(parsed.getTimestamp(), "2017/09/09 17:14:50");
         assertEquals(parsed.getIp(), "77.65.91.38");
         assertEquals(parsed.getServer(), "naxsi.kierzek.pl");
         assertEquals(parsed.getUri(), "/");
@@ -39,7 +37,7 @@ public class ParseLogLineTest {
 
         ParseLogLine.FMTLog parsed = (ParseLogLine.FMTLog) new ParseLogLine().map(new ExtractNaxsiMessage.NaxsiTuple("fmt", log));
 
-        assertEquals(parsed.getTimestamp(),sdf.parse("2017/09/12 14:38:50"));
+        assertEquals(parsed.getTimestamp(),"2017/09/12 14:38:50");
         assertEquals(parsed.getIp(), "85.232.253.3");
         assertEquals(parsed.getServer(), "naxsi.kierzek.pl");
         assertEquals(parsed.getUri(), "/");
@@ -54,7 +52,7 @@ public class ParseLogLineTest {
 
         ParseLogLine.ExtendedLog parsed = (ParseLogLine.ExtendedLog) new ParseLogLine().map(new ExtractNaxsiMessage.NaxsiTuple("exlog", log));
 
-        assertEquals(parsed.getTimestamp(),sdf.parse("2017/09/12 14:38:28"));
+        assertEquals(parsed.getTimestamp(),"2017/09/12 14:38:28");
         assertEquals(parsed.getIp(), "85.232.253.3");
         assertEquals(parsed.getServer(), "naxsi.kierzek.pl");
         assertEquals(parsed.getUri(), "/");
@@ -63,4 +61,17 @@ public class ParseLogLineTest {
         assertEquals(parsed.getVarName(), "password");
         assertEquals(parsed.getContent(), "'''''''''''''\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"<script>");
     }
+
+    @Test
+    public void testEXLog_2() throws Exception {
+        String log = "2017/09/12 16:41:53 [error] 2693#2693: *41845 NAXSI_EXLOG: ip=85.232.253.3&server=naxsi.kierzek.pl&uri=/&id=1016&zone=ARGS&var_name=fwf&content=322)%20OR%20(SELECT%20*%20FROM%20(SELECT(SLEEP(5)))pZOq)%23, client: 85.232.253.3, server: naxsi.kierzek.pl, request: \\\"GET /?fwf=322%29%20OR%20%28SELECT%20%2A%20FROM%20%28SELECT%28SLEEP%285%29%29%29pZOq%29%23&njf=2323 HTTP/1.1\\\", host: \\\"naxsi.kierzek.pl\\\"";
+
+        ParseLogLine.ExtendedLog parsed = (ParseLogLine.ExtendedLog) new ParseLogLine().map(new ExtractNaxsiMessage.NaxsiTuple("exlog", log));
+
+        assertEquals(parsed.getTimestamp(),"2017/09/12 16:41:53");
+        assertEquals(parsed.getIp(), "85.232.253.3");
+        assertEquals(parsed.getServer(), "naxsi.kierzek.pl");
+        assertEquals(parsed.getUri(), "/");
+    }
+
 }

@@ -8,6 +8,9 @@ public class SetContentInFindings implements CoGroupFunction<ParseLogLine.Parsed
     @Override
     public void coGroup(Iterable<ParseLogLine.ParsedLogEntry> fmtIterable, Iterable<ParseLogLine.ParsedLogEntry> exlogIterable, Collector<ParseLogLine.FMTLog> collector) throws Exception {
         for (ParseLogLine.ParsedLogEntry fmt : fmtIterable) {
+            if(fmt == null) {
+                continue;
+            }
             if (fmt.getRequest().startsWith("GET")) {
                 setFindingsContentsInGET(fmt);
             } else if(fmt.getRequest().startsWith("POST")) {
@@ -22,6 +25,9 @@ public class SetContentInFindings implements CoGroupFunction<ParseLogLine.Parsed
         for (ParseLogLine.FMTLog.Finding finding : fmt.getFindings()) {
             for (ParseLogLine.ParsedLogEntry parsedExlog : exlogIterable) {
                 ParseLogLine.ExtendedLog exlog = ((ParseLogLine.ExtendedLog) parsedExlog);
+                if(exlog == null) {
+                    continue;
+                }
                 if (finding.getVarName().equals(exlog.getVarName())) {
                     finding.setContent(exlog.getContent());
                 }

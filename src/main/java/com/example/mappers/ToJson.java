@@ -5,24 +5,19 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.apache.flink.api.common.functions.MapFunction;
 
-import java.text.SimpleDateFormat;
-import java.util.Map;
-
 public class ToJson implements MapFunction<ParseLogLine.FMTLog, String> {
 
     private static Gson parser;
-    private static SimpleDateFormat sdf;
 
     static {
         parser = new Gson();
-        sdf = new SimpleDateFormat("YYYY-MM-DD'T'HH:mm:ssZ");
     }
 
     @Override
     public String map(ParseLogLine.FMTLog entry) throws Exception {
         JsonObject json = new JsonObject();
 
-        json.addProperty("timestamp", sdf.format(entry.getTimestamp()));
+        json.addProperty("timestamp", entry.getTimestamp());
         json.addProperty("ip", entry.getIp());
         json.addProperty("uri", entry.getUri());
         json.addProperty("server", entry.getServer());
