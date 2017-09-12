@@ -12,13 +12,13 @@ import java.io.Serializable;
 public class ExtractNaxsiMessage implements MapFunction<String,ExtractNaxsiMessage.NaxsiTuple> {
 
     public NaxsiTuple map(String s) throws Exception {
-    int beginIndex = s.indexOf("message\":\"")+11;
-    int endIndex = s.lastIndexOf("\",\"type\":");
+        int beginIndex = s.indexOf("message\":\"")+10;
+        int endIndex = s.lastIndexOf("\",\"type\":");
 
-    String message = s.substring(beginIndex, endIndex < 0 ? s.length() : endIndex);
-    String type = message.contains("NAXSI_FMT")?"fmt":message.contains("NAXSI_EXLOG")?"exlog":"other";
+        String message = s.substring(beginIndex, endIndex < 0 ? s.length() : endIndex);
+        String type = message.contains("NAXSI_FMT")?"fmt":message.contains("NAXSI_EXLOG")?"exlog":"other";
 
-    return new NaxsiTuple(type, message);
+        return new NaxsiTuple(type, message);
     }
 
     @AllArgsConstructor @Getter

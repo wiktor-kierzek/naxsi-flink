@@ -3,10 +3,12 @@ package com.example.mappers;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.MapFunction;
 
 import java.io.Serializable;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -27,6 +29,8 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
     private static Pattern VARNAME_EXLOG_REGEX = Pattern.compile("var_name=([^&]*)(?=&)");
 
     private static Pattern FMT_LINE_REGEX = Pattern.compile("NAXSI_FMT:\\s(.+)(?=,\\sclient)");
+
+    public static SimpleDateFormat TIMESTAMP_FORMAT = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
 
     public ParsedLogEntry map(ExtractNaxsiMessage.NaxsiTuple log) throws Exception {
@@ -49,7 +53,7 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
         return null;
     }
 
-    private FMTLog parseFMT(String line) {
+    private FMTLog parseFMT(String line) throws ParseException {
         List<FMTLog.Finding> findings = new LinkedList<>();
 
         String[] events = getValue(FMT_LINE_REGEX, line).split("&zone");
@@ -68,7 +72,7 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
 
         return new FMTLog(
             getValue(IP_REGEX, line),
-            getValue(TIMESTAMP_REGEX, line),
+            TIMESTAMP_FORMAT.parse(getValue(TIMESTAMP_REGEX, line)),
             getValue(SERVER_REGEX, line),
             getValue(URI_REGEX, line),
             getValue(REQUEST_REGEX, line),
@@ -76,10 +80,10 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
         );
     }
 
-    private ExtendedLog parseEX(String line) {
+    private ExtendedLog parseEX(String line) throws ParseException {
         return new ExtendedLog(
             getValue(IP_REGEX, line),
-            getValue(TIMESTAMP_REGEX, line),
+            TIMESTAMP_FORMAT.parse(getValue(TIMESTAMP_REGEX, line)),
             getValue(SERVER_REGEX, line),
             getValue(URI_REGEX, line),
             getValue(REQUEST_REGEX, line),
@@ -96,15 +100,16 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
 
     @AllArgsConstructor @Getter
     public abstract static class ParsedLogEntry implements Serializable {
-        protected String ip, timestamp, server, uri, request;
+        protected String ip, server, uri, request;
+        protected Date timestamp;
     }
 
     @Getter
     public static class FMTLog extends ParsedLogEntry {
         private List<Finding> findings;
 
-        FMTLog(String ip, String timestamp, String server, String uri, String request, List<Finding> findings) {
-            super(ip, timestamp, server, uri, request);
+        FMTLog(String ip, Date timestamp, String server, String uri, String request, List<Finding> findings) {
+            super(ip, server, uri, request, timestamp);
             this.findings = findings;
         }
 
@@ -143,8 +148,8 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
     public static class ExtendedLog extends ParsedLogEntry {
         private String varName, content;
 
-        ExtendedLog(String ip, String timestamp, String server, String uri, String request, String varName, String content) {
-            super(ip, timestamp, server, uri, request);
+        ExtendedLog(String ip, Date timestamp, String server, String uri, String request, String varName, String content) {
+            super(ip, server, uri, request, timestamp);
             this.varName = varName;
             this.content = content;
         }

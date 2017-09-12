@@ -47,7 +47,7 @@ public class NaxsiFlink {
 
         Map<String, String> elasticConfig = new HashMap<>();
         elasticConfig.put("cluster.name", "elasticsearch");
-        elasticConfig.put("bulk.flush.max.actions", "1");
+        elasticConfig.put("bulk.flush.max.actions", "100");
 
         List<InetSocketAddress> transportAddresses = new ArrayList<>();
         transportAddresses.add(new InetSocketAddress(InetAddress.getByName("51.254.142.16"), 9300));
@@ -64,13 +64,12 @@ public class NaxsiFlink {
 
         DataStream<ParseLogLine.ParsedLogEntry> exlogStream =
             input.select("exlog")
-                    .map(new ParseLogLine())
-                    .filter(naxsiTuple -> naxsiTuple != null);
+                    .map(new ParseLogLine());
+
 
         DataStream<ParseLogLine.ParsedLogEntry> fmtStream =
             input.select("fmt")
-                    .map(new ParseLogLine())
-                    .filter(naxsiTuple -> naxsiTuple != null);
+                    .map(new ParseLogLine());
 
 
         DataStreamSink<String> joinedStreams =
@@ -92,7 +91,7 @@ public class NaxsiFlink {
 
     public static class GetHashForTuple implements KeySelector<ParseLogLine.ParsedLogEntry, String> {
         public String getKey(ParseLogLine.ParsedLogEntry tuple) throws Exception {
-            return DigestUtils.md5Hex(tuple.getTimestamp() + tuple.getIp() + tuple.getUri()
+            return DigestUtils.md5Hex(tuple.getTimestamp() + tuple.getIp() + tuple.getRequest()
             );
         }
     }
