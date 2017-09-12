@@ -4,4 +4,4 @@
 target/**
 **/target/**
 *.jar
-
+*.properties

@@ -1,0 +1,8 @@
+amqp.uri =
+amqp.queue.name =
+
+elastic.host =
+elastic.port =
+elastic.cluster.name =
+elastic.index.name =
+elastic.index.type =

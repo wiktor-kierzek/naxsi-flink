@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Created by _sn on 07.09.2017.
+ * Created by wiktor.kierzek on 07.09.2017.
  */
 @Slf4j
 public class NaxsiFlink {
@@ -42,19 +42,22 @@ public class NaxsiFlink {
         env.enableCheckpointing(5000, CheckpointingMode.EXACTLY_ONCE);
 
         RMQConnectionConfig rabbitMqConfig = new RMQConnectionConfig.Builder()
-            .setUri("amqp://flink:uGPxSmAWRuu5AtSx@51.255.199.51:5672").build();
+            .setUri(Settings.get("amqp.uri")).build();
 
         Map<String, String> elasticConfig = new HashMap<>();
-        elasticConfig.put("cluster.name", "elasticsearch");
+        elasticConfig.put("cluster.name", Settings.get("elastic.cluster.name"));
         elasticConfig.put("bulk.flush.max.actions", "100");
 
         List<InetSocketAddress> transportAddresses = new ArrayList<>();
-        transportAddresses.add(new InetSocketAddress(InetAddress.getByName("51.254.142.16"), 9300));
+        transportAddresses.add(new InetSocketAddress(InetAddress.getByName(
+            Settings.get("elastic.host")),
+            Integer.parseInt(Settings.get("elastic.port")
+            )));
 
         SplitStream<ExtractNaxsiMessage.NaxsiTuple> input = env
             .addSource(new RMQSource<>(
                 rabbitMqConfig,
-                "naxsi",
+                Settings.get("amqp.queue.name"),
                 false,
                 new SimpleStringSchema()
             ), TypeInformation.of(String.class)).setParallelism(1).returns(String.class)
@@ -80,8 +83,8 @@ public class NaxsiFlink {
             .addSink(new ElasticsearchSink<>(elasticConfig, transportAddresses,
                     (ElasticsearchSinkFunction<String>) (element, ctx, indexer) ->
                             indexer.add(Requests.indexRequest()
-                                            .index("naxsi-events")
-                                            .type("event")
+                                            .index(Settings.get("elastic.index.name"))
+                                            .type(Settings.get("elastic.index.type"))
                                             .source(element)
                             ))).setParallelism(2);
 
