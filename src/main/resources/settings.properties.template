@@ -6,3 +6,6 @@ elastic.port =
 elastic.cluster.name =
 elastic.index.name =
 elastic.index.type =
+
+opsgenie.api.key =
+opsgenie.api.team =
