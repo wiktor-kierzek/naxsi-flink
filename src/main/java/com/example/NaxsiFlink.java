@@ -51,7 +51,7 @@ public class NaxsiFlink {
 
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(5000, CheckpointingMode.EXACTLY_ONCE);
+        env.enableCheckpointing(1000, CheckpointingMode.EXACTLY_ONCE);
 
         RMQConnectionConfig rabbitMqConfig = new RMQConnectionConfig.Builder()
             .setUri(Settings.get("amqp.uri")).build();
@@ -78,27 +78,29 @@ public class NaxsiFlink {
 
         DataStream<ParseLogLine.ParsedLogEntry> exlogStream =
             input.select("exlog")
-                .map(new ParseLogLine());
+                .map(new ParseLogLine())
+                .filter(t -> t!=null);
 
 
         DataStream<ParseLogLine.ParsedLogEntry> fmtStream =
             input.select("fmt")
-                .map(new ParseLogLine());
+                .map(new ParseLogLine())
+                .filter(t -> t!=null);
 
         fmtStream.flatMap((ParseLogLine.ParsedLogEntry fmt, Collector<OpsGenieTuple> out) -> {
                 for (ParseLogLine.FMTLog.Finding finding : ((ParseLogLine.FMTLog) fmt).getFindings()) {
                     out.collect(new OpsGenieTuple(fmt.getIp() + finding.getType().toString(), fmt.getIp(), finding.getType().toString()));
                 }
-            }).returns(OpsGenieTuple.class)
+            }).returns(OpsGenieTuple.class).setParallelism(5)
             .keyBy("hash").reduce((t1, t2) -> t1)
             .keyBy("hash").window(SlidingProcessingTimeWindows.of(Time.seconds(60), Time.seconds(30)))
             .sum("count")
-            .filter(t->t.count > 100)
+            .filter(t->t.count > 20)
             .addSink(new OpsGenieSink());
 
         fmtStream.coGroup(exlogStream)
             .where(new GetHashForTuple()).equalTo(new GetHashForTuple())
-            .window(SlidingProcessingTimeWindows.of(Time.seconds(30), Time.seconds(5)))
+            .window(SlidingProcessingTimeWindows.of(Time.seconds(5), Time.seconds(1)))
             .apply(new SetContentInFindings()).map(new ToJson())
             .addSink(new ElasticsearchSink<>(elasticConfig, transportAddresses,
                 (ElasticsearchSinkFunction<String>) (element, ctx, indexer) ->

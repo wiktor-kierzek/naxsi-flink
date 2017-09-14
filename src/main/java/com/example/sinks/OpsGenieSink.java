@@ -11,9 +11,6 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.util.Collections;
 
-/**
- * Created by wiktor.kierzek@curency-one.com on 13.09.2017.
- */
 public class OpsGenieSink implements SinkFunction<OpsGenieTuple> {
 
     private static OpsGenieClient client;
@@ -26,6 +23,8 @@ public class OpsGenieSink implements SinkFunction<OpsGenieTuple> {
     public void invoke(OpsGenieTuple tuple) throws Exception {
 
         String message = String.format("%s attack by ip: %s", tuple.type, tuple.ip);
+
+        System.out.println(message);
 
         CreateAlertRequest request = new CreateAlertRequest();
         request.setApiKey(Settings.get("opsgenie.api.key"));

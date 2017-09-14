@@ -4,9 +4,6 @@ import lombok.Getter;
 
 import java.io.Serializable;
 
-/**
- * Created by wiktor.kierzek@curency-one.com on 14.09.2017.
- */
 public class OpsGenieTuple implements Serializable {
     @Getter
     public String hash, ip, type;
