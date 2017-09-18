@@ -12,6 +12,7 @@ import static org.testng.Assert.*;
 public class ParseLogLineTest {
 
     @Test
+    //nazwewnictwo testow i uwagi z ExtractNaxsiMEssageTest.java
     public void testFMT_1() throws Exception {
         String log = "2017/09/09 17:14:50 [error] 16048#0: *3045261 NAXSI_FMT: ip=77.65.91.38&server=naxsi.kierzek.pl&uri=/&total_processed=5&total_blocked=4&zone0=ARGS&id0=1000&var_name0=v&zone1=ARGS&id1=1007&var_name1=v&zone2=ARGS&id2=1015&var_name2=v, client: 77.65.91.38, server: naxsi.kierzek.pl, request: \\\"GET /?v=32%20UNION%20ALL%20SELECT%20NULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL%2CNULL--%20XwUM HTTP/1.1\\\", host: \\\"naxsi.kierzek.pl\\\"";
 
@@ -25,6 +26,7 @@ public class ParseLogLineTest {
 
         assertEquals(parsed.getFindings().size(),3);
 
+        //parsed.getFindings().get(0) mozna wydzielic do zmiennej
         assertEquals(parsed.getFindings().get(0).getId(), "1000");
         assertEquals(parsed.getFindings().get(0).getZone(), "ARGS");
         assertEquals(parsed.getFindings().get(0).getType(), ParseLogLine.FMTLog.Finding.TYPE.SQLi);

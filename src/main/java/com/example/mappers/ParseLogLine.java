@@ -34,10 +34,11 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
 
     public ParsedLogEntry map(ExtractNaxsiMessage.NaxsiTuple log) throws Exception {
         switch (log.getLog()) {
-            case "fmt":
+            case "fmt": //duplikacja stalych stringowych z ExtractNaxsiMessage - kolejny argument, zeby zrobic z tego enuma : LogType.FMT
                 try {
                     return parseFMT(log.getMessage());
                 } catch (Throwable e) {
+                    //luzna obserwacja: w aplikacji masz (NaxsiFlink.java) @Slf4j a robisz System.out.println zamiast uzywac loggerow
                     System.out.println("Could not parse FMT: "+log.getMessage());
                 }
             case "exlog":
@@ -99,6 +100,9 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
         return matcher.group(1);
     }
 
+
+    //Wszystkie klasy do wyciagniecia do osobnych plikow
+    //zamiast @AllArgsConstruktor lepiej uzyc @Builder (w razie zmian przy podbiciu lomboka bedziemy bezpieczni)
     @AllArgsConstructor @Getter
     public abstract static class ParsedLogEntry implements Serializable {
         protected String ip, server, uri, request, timestamp;
@@ -116,6 +120,8 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
         @AllArgsConstructor @Getter
         public static class Finding {
 
+            //ten enum zasluguje na osobny plik
+            //btw. enum w klasie, ktora jest w klasie, ktora jest w klasie == niemozliwe do napisania testy jednostkowe
             public enum TYPE {
                 Error, SQLi, RFI, Traversal, XSS, Evading, Uploads;
 

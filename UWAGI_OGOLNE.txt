@@ -1,0 +1,10 @@
+1. Testy: Całość jest nieco slabo otestowana, do 100% pokrycia troche brakuje ;)
+   - W związku z tym, że nie uzywasz zadnego frameworka dependency injection wydaje mi sie,
+     ze testowanie moze byc trudne i nie obejdzie sie bez powermocka - ogólnie sugerowałbym użycie jakiegoś frameworka DI (spring, guice)
+   - dopisanie testow unitowych to must have
+   - napisana aplikacja jest elementem duzej ukladanki, przez co powinna byc otestowana integracyjnie i komponentowo (z symulacja dzialajacych rabbita, elastica).
+     mozna to zrobic w miare prosto uzywajac maven-docker-plugin'a, którym przy testach integracyjnych postawisz sobie kilkoma linijkami w pomie dzialajace wydmuszki
+   - gdybys mial problem z ideą testów integracyjnych i komponentowych to polecam: https://martinfowler.com/articles/microservice-testing/ odkad to przeczytalem to jakosc dostarczanego kodu wzrosla - odplaca sie przy rozwoju produktu MAX
+2. Nie pisałem tego w każdym miejscu, ale praktycznie każda klasa ma nieużywane importy - do wywalenia :)
+3. Strasznie dużo kodu upchanego jest w pojedyncze klasy - jeden plik ma kilka klas wewnetrznych, jesli intencja bylo ich ukrycie mozesz zawsze pogrupowac je w package i zrobic package scoped. Ogólnie IMO potrzeba wydzielić wszystkie wewnetrzne klasy.
+

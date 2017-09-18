@@ -11,6 +11,7 @@ public class SetContentInFindings implements CoGroupFunction<ParseLogLine.Parsed
             if(fmt == null) {
                 continue;
             }
+            //pierdola, ale mozna wyciagnac fmt.getRequest() do zmiennej
             if (fmt.getRequest().startsWith("GET")) {
                 setFindingsContentsInGET(fmt);
             } else if(fmt.getRequest().startsWith("POST")) {
@@ -37,7 +38,8 @@ public class SetContentInFindings implements CoGroupFunction<ParseLogLine.Parsed
 
     private void setFindingsContentsInGET(ParseLogLine.ParsedLogEntry fmt) {
         String[] variables = fmt.getRequest()
-            .substring(fmt.getRequest().indexOf("/?") + 2, fmt.getRequest().lastIndexOf(" "))
+            //nie wiem czy nie lepiej zrobic Pattern i Matcher i wyciagnac grupy (chociaz regexp i ponizsze beda tak samo nieczytelne :P)
+                .substring(fmt.getRequest().indexOf("/?") + 2, fmt.getRequest().lastIndexOf(" "))
             .split("&");
 
         for (String variable : variables) {
