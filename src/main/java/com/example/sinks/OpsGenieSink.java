@@ -27,16 +27,16 @@ public class OpsGenieSink implements SinkFunction<OpsGenieTuple> {
         System.out.println(message);
 
         CreateAlertRequest request = new CreateAlertRequest();
-        request.setApiKey(Settings.get("opsgenie.api.key"));
+        request.setApiKey(Settings.get("opsgenie.api.key"));//o settingsach pisalem w NaxsiFlink.java :)
         request.setMessage(message);
-        request.setSource("flink");
+        request.setSource("flink"); //wyciagnalbym do stalej, a moze do propertiesow?
         request.setTeams(Collections.singletonList(Settings.get("opsgenie.api.team")));
 
         try {
             CreateAlertResponse response = client.alert().createAlert(request);
             response.getAlertId();
         } catch (OpsGenieClientException | IOException | ParseException e) {
-            System.err.println("Could not create OpsGenie alert");
+            System.err.println("Could not create OpsGenie alert"); //zamiast system.out uzylbym loggera, skoro juz robisz @Sfl :)
             e.printStackTrace();
         }
     }

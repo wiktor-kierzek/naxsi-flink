@@ -7,10 +7,12 @@ import org.apache.flink.api.common.functions.MapFunction;
 
 public class ToJson implements MapFunction<ParseLogLine.FMTLog, String> {
 
+    //Duzo latwiejszy w uzyciu imo ObjectMapper http://www.baeldung.com/jackson-object-mapper-tutorial
+    //mozna zrobic ladne mapowania, ale to juz lukier :)
     private static Gson parser;
 
     static {
-        parser = new Gson();
+        parser = new Gson(); // dlaczego tak? nie mozna od razu przy deklaracji pola?
     }
 
     @Override

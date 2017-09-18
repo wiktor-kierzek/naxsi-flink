@@ -17,14 +17,16 @@ public class ExtractNaxsiMessage implements MapFunction<String,ExtractNaxsiMessa
         int endIndex = s.lastIndexOf("\",\"type\":");
 
         String message = s.substring(beginIndex, endIndex < 0 ? s.length() : endIndex);
-        String type = message.contains("NAXSI_FMT")?"fmt":message.contains("NAXSI_EXLOG")?"exlog":"other";
+        //type nie powinien byc enumem?
+        String type = message.contains("NAXSI_FMT")?"fmt":message.contains("NAXSI_EXLOG")?"exlog":"other"; // te magiczne stringi bym wyciagnal do stalych
 
-        return new NaxsiTuple(type, message);
+        return new NaxsiTuple(type, message); //zamiast konstruktora zrobilbym buildera(lombok ma anotacje @Builder). Tutaj mamy dwa parametry stringowe, co jak podbije ktos wersje lomboka i nagle generowany konstruktor bedzie lykał parametry w innej kolejności?
     }
 
+    //wyciagnalbym do osobnej klasy, tj. pliku
     @AllArgsConstructor @Getter
     public static class NaxsiTuple implements Serializable {
-        private String log;
+        private String log; //tutaj bym zrobil enuma-w koncu jest skonczony zbior wartosci type
         private String message;
     }
 }

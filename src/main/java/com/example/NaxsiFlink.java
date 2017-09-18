@@ -1,4 +1,7 @@
+//nazwa paczki do zmiany panie "example" ;)
 package com.example;
+
+//Bardzo duzo nieuzywanych importow - do usuniecia! :)
 
 import com.example.joins.SetContentInFindings;
 import com.example.mappers.ExtractNaxsiMessage;
@@ -49,82 +52,133 @@ import java.util.Map;
 @Slf4j
 public class NaxsiFlink {
 
+    /*  1. metoda jest za duza, proponuje wydzielic male factory albo buildery
+        2. zla praktyka jest na metodzie main robienie throws Exception:
+            brak kontroli wyjatkow, niektore pewnie mozna failsafeowac i nie konczyc dzialania programu
+        3. idealnie jakby w mainie bylo tylko proste ustawienie enva np.
+            env = new StreamExecutionEnvironmentBuilder()
+                .withCheckpoiting(1000m EXCACTLY_ONCE)
+                .withSource(...)
+                ...with fmtStream(na ktorego tez bym buildera wydzielil), itd.
+                .build();
+           i na koncu
+           env.execute();
+
+           Takie podejscie oszczedziloby sporo czasu podczas wgryzania sie w kod i na pewno odplaci sie przy rozwoju aplikacji
+
+     */
     public static void main(String[] args) throws Exception {
+        //zrobilbym buildera tj StreamExecutionEnvironmentBuilder, troche nizej wytlumaczone dlaczego
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+        //wartosc interval bym wyciagnal do propertiesow
         env.enableCheckpointing(1000, CheckpointingMode.EXACTLY_ONCE);
 
-        RMQConnectionConfig rabbitMqConfig = new RMQConnectionConfig.Builder()
-            .setUri(Settings.get("amqp.uri")).build();
+        /*magiczne stringi typu "amqp.uri" bym wyciagnal do enumow:
+        public enum SettingKey {
+            URI("amqp.uri"),
+            QUEUE_NAME("amqp.queue.name"),
+            itd....;
 
+            private String value;
+
+            AmqpSettings(String value) {
+                this.value = value;
+            }
+
+            @Override
+            public String toString() {
+                return this.value;
+            }
+        }
+        zamiast Settings.get("amqp.uri") by bylo Settings.get(SettingKey.URI) - niweluje niebezpieczenstwo literowek i robi ORDNUNG!!! :D
+        */
+        RMQConnectionConfig rabbitMqConfig = new RMQConnectionConfig.Builder()
+                .setUri(Settings.get("amqp.uri")).build();
+
+        //tak samo z magic stringami od elastica:
+        //zamiast elasticConfig.put("cluster.name, Settings.get("elastic.cluster.name")
+        //->
+        // elasticConfig.put(ElasticSettings.CLUSTER_NAME, Settings.get(SettingKey.ELASTIC_CLUSTER_NAME
         Map<String, String> elasticConfig = new HashMap<>();
         elasticConfig.put("cluster.name", Settings.get("elastic.cluster.name"));
         elasticConfig.put("bulk.flush.max.actions", "100");
 
+        //wyciagnalbym to do prostego utila/serwisu
         List<InetSocketAddress> transportAddresses = new ArrayList<>();
         transportAddresses.add(new InetSocketAddress(InetAddress.getByName(
-            Settings.get("elastic.host")),
-            Integer.parseInt(Settings.get("elastic.port")
-            )));
+                Settings.get("elastic.host")),
+                Integer.parseInt(Settings.get("elastic.port")
+                )));
 
+        //jw. to ma sporo logiki, wyciagnalbym do buildera, o ktorym mowilem na poczatku metody - bedzie latwiej testowac
         SplitStream<ExtractNaxsiMessage.NaxsiTuple> input = env
-            .addSource(new RMQSource<>(
-                rabbitMqConfig,
-                Settings.get("amqp.queue.name"),
-                false,
-                new SimpleStringSchema()
-            ), TypeInformation.of(String.class)).setParallelism(1).returns(String.class)
-            .map(new ExtractNaxsiMessage()).setParallelism(5)
-            .split((OutputSelector<ExtractNaxsiMessage.NaxsiTuple>) value -> Lists.newArrayList(value.getLog()));
+                .addSource(new RMQSource<>(
+                        rabbitMqConfig,
+                        Settings.get("amqp.queue.name"),
+                        false,
+                        new SimpleStringSchema()
+                ), TypeInformation.of(String.class))
+                .setParallelism(1) //dlaczego 1, source rabbita nie jest parallel?
+                .returns(String.class)
+                .map(new ExtractNaxsiMessage()).setParallelism(5) // to 5 bym wyciagnal do propertiesow, jak projekt bedzie rosl trudniej bedzie znajdowac takie magic numbery
+                .split((OutputSelector<ExtractNaxsiMessage.NaxsiTuple>) value -> Lists.newArrayList(value.getLog()));
 
         DataStream<ParseLogLine.ParsedLogEntry> exlogStream =
-            input.select("exlog")
-                .map(new ParseLogLine())
-                .filter(t -> t!=null);
+                input.select("exlog") //magiczny string - wyciagnal bym do stalej
+                        .map(new ParseLogLine())
+                        .filter(t -> t != null);
 
 
         DataStream<ParseLogLine.ParsedLogEntry> fmtStream =
-            input.select("fmt")
-                .map(new ParseLogLine())
-                .filter(t -> t!=null);
+                input.select("fmt")
+                        //tutaj mamy identyczny kod tylko dla innej wartosci outputName - wyciagnac do metody prywatnej
+                        /*
+                        private DataStream<ParseLogLine.ParsedLogEntry> getStreamForOutputName(SplitStream input, String name){
+                            return input.select(name)
+                                        .map(new ParseLogLine())
+                                        .filter(t -> t != null);
+                        }
+                         */
+                        .map(new ParseLogLine()) // czy trzeba tworzyc za kazdym razem nowa instancje ParseLogLine? Pattern jest thread safe, wiec ta klasa jesli nic nie przeoczylem rowniez
+                        .filter(t -> t != null);
 
+        //to cale inlineowe flatmap function do wyciagniecia do osobnej klasy
         fmtStream.flatMap((ParseLogLine.ParsedLogEntry fmt, Collector<OpsGenieTuple> out) -> {
-                for (ParseLogLine.FMTLog.Finding finding : ((ParseLogLine.FMTLog) fmt).getFindings()) {
-                    out.collect(new OpsGenieTuple(fmt.getIp() + finding.getType().toString(), fmt.getIp(), finding.getType().toString()));
-                }
-            }).returns(OpsGenieTuple.class).setParallelism(5)
-            .keyBy("hash").reduce((t1, t2) -> t1)
-            .keyBy("hash").window(SlidingProcessingTimeWindows.of(Time.seconds(60), Time.seconds(30)))
-            .sum("count")
-            .filter(t->t.count > 20)
-            .addSink(new OpsGenieSink());
+            for (ParseLogLine.FMTLog.Finding finding : ((ParseLogLine.FMTLog) fmt).getFindings()) {
+                out.collect(new OpsGenieTuple(fmt.getIp() + finding.getType().toString(), fmt.getIp(), finding.getType().toString()));
+            }
+        }).returns(OpsGenieTuple.class)
+                .setParallelism(5) // magiczne 5 bym do propertiesow wyciagnal
+                .keyBy("hash").reduce((t1, t2) -> t1) //znowu magic string -> wyciagnalbym do stalej
+                .keyBy("hash").window(SlidingProcessingTimeWindows.of(Time.seconds(60), Time.seconds(30))) // te czasu imo powinny byc w propertiesach
+                .sum("count")
+                .filter(t -> t.count > 20) // tak samo jak ta 20 :)
+                .addSink(new OpsGenieSink());
 
         fmtStream.coGroup(exlogStream)
-            .where(new GetHashForTuple()).equalTo(new GetHashForTuple())
-            .window(SlidingProcessingTimeWindows.of(Time.seconds(5), Time.seconds(1)))
-            .apply(new SetContentInFindings()).map(new ToJson())
-            .addSink(new ElasticsearchSink<>(elasticConfig, transportAddresses,
-                (ElasticsearchSinkFunction<String>) (element, ctx, indexer) ->
-                    indexer.add(Requests.indexRequest()
-                        .index(Settings.get("elastic.index.name"))
-                        .type(Settings.get("elastic.index.type"))
-                        .source(element)
-                ))).setParallelism(2);
+                .where(new GetHashForTuple()).equalTo(new GetHashForTuple())
+                .window(SlidingProcessingTimeWindows.of(Time.seconds(5), Time.seconds(1))) // jw. do propertiesow
+                .apply(new SetContentInFindings()).map(new ToJson())
+                .addSink(new ElasticsearchSink<>(elasticConfig, transportAddresses,
+                        (ElasticsearchSinkFunction<String>) (element, ctx, indexer) ->
+                                indexer.add(Requests.indexRequest()
+                                        .index(Settings.get("elastic.index.name"))
+                                        .type(Settings.get("elastic.index.type"))
+                                        .source(element)
+                                ))).setParallelism(2);
 
         env.execute("Naxsi");
     }
 
+    //do wydzielenia do osobnej klasy
     public static class GetHashForTuple implements KeySelector<ParseLogLine.ParsedLogEntry, String> {
         public String getKey(ParseLogLine.ParsedLogEntry tuple) throws Exception {
+            //nie wiem do czego ta md5ka bedzie uzywana ale md5 w 2017 wyglada dziwnie ;)
             return tuple == null ? "" : DigestUtils.md5Hex(tuple.getTimestamp() + tuple.getIp() + tuple.getRequest()
             );
         }
     }
-
-
-
-
-
-
 
 
 }
