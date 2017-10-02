@@ -1,11 +1,12 @@
 package com.example.mappers;
 
+import com.example.data.tuple.FMTLog;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.apache.flink.api.common.functions.MapFunction;
 
-public class ToJson implements MapFunction<ParseLogLine.FMTLog, String> {
+public class ToJson implements MapFunction<FMTLog, String> {
 
     private static Gson parser;
 
@@ -14,7 +15,7 @@ public class ToJson implements MapFunction<ParseLogLine.FMTLog, String> {
     }
 
     @Override
-    public String map(ParseLogLine.FMTLog entry) throws Exception {
+    public String map(FMTLog entry) throws Exception {
         JsonObject json = new JsonObject();
 
         json.addProperty("timestamp", entry.getTimestamp());
@@ -24,7 +25,7 @@ public class ToJson implements MapFunction<ParseLogLine.FMTLog, String> {
         json.addProperty("request", entry.getRequest());
 
         JsonArray jsonFindings = new JsonArray();
-        for(ParseLogLine.FMTLog.Finding finding: entry.getFindings()) {
+        for(FMTLog.Finding finding: entry.getFindings()) {
             JsonObject jsonFinding = new JsonObject();
             jsonFinding.addProperty("type", finding.getType().toString());
             jsonFinding.addProperty("id", finding.getId());

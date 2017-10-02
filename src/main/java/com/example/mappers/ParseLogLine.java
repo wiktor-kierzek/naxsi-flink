@@ -1,5 +1,9 @@
 package com.example.mappers;
 
+import com.example.data.tuple.ExtendedLog;
+import com.example.data.tuple.FMTLog;
+import com.example.data.tuple.NaxsiTuple;
+import com.example.data.tuple.ParsedLogEntry;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * Created by _sn on 10.09.2017.
  */
-public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,ParseLogLine.ParsedLogEntry> {
+public class ParseLogLine implements MapFunction<NaxsiTuple, ParsedLogEntry> {
 
     private static Pattern IP_REGEX = Pattern.compile("ip=([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})&");
     private static Pattern SERVER_REGEX = Pattern.compile("server=([^&]*)(?=&)");
@@ -32,7 +36,7 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
     public static SimpleDateFormat TIMESTAMP_FORMAT = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
 
-    public ParsedLogEntry map(ExtractNaxsiMessage.NaxsiTuple log) throws Exception {
+    public ParsedLogEntry map(NaxsiTuple log) throws Exception {
         switch (log.getLog()) {
             case "fmt":
                 try {
@@ -97,61 +101,5 @@ public class ParseLogLine implements MapFunction<ExtractNaxsiMessage.NaxsiTuple,
         Matcher matcher = pattern.matcher(line);
         matcher.find();
         return matcher.group(1);
-    }
-
-    @AllArgsConstructor @Getter
-    public abstract static class ParsedLogEntry implements Serializable {
-        protected String ip, server, uri, request, timestamp;
-    }
-
-    @Getter
-    public static class FMTLog extends ParsedLogEntry {
-        private List<Finding> findings;
-
-        FMTLog(String ip, String timestamp, String server, String uri, String request, List<Finding> findings) {
-            super(ip, server, uri, request, timestamp);
-            this.findings = findings;
-        }
-
-        @AllArgsConstructor @Getter
-        public static class Finding {
-
-            public enum TYPE {
-                Error, SQLi, RFI, Traversal, XSS, Evading, Uploads;
-
-                static TYPE getType(int id) {
-                    if(id<1000) {
-                        return Error;
-                    }
-
-                    id = (id-1000) / 100;
-
-                    switch (id) {
-                        case 0: return SQLi;
-                        case 1: return RFI;
-                        case 2: return Traversal;
-                        case 3: return XSS;
-                        case 4: return Evading;
-                        case 5: return Uploads;
-                    }
-                    return Error;
-                }
-            }
-
-            private TYPE type;
-            private String zone, id, varName;
-            @Setter private String content;
-        }
-    }
-
-    @Getter
-    public static class ExtendedLog extends ParsedLogEntry {
-        private String varName, content;
-
-        ExtendedLog(String ip, String timestamp, String server, String uri, String request, String varName, String content) {
-            super(ip, server, uri, request, timestamp);
-            this.varName = varName;
-            this.content = content;
-        }
     }
 }

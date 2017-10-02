@@ -1,5 +1,6 @@
 package com.example.mappers;
 
+import com.example.data.tuple.NaxsiTuple;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -10,7 +11,7 @@ import java.util.regex.Pattern;
 /**
  * Created by _sn on 10.09.2017.
  */
-public class ExtractNaxsiMessage implements MapFunction<String,ExtractNaxsiMessage.NaxsiTuple> {
+public class ExtractNaxsiMessage implements MapFunction<String, NaxsiTuple> {
 
     public NaxsiTuple map(String s) throws Exception {
         int beginIndex = s.indexOf("message\":\"")+10;
@@ -20,12 +21,6 @@ public class ExtractNaxsiMessage implements MapFunction<String,ExtractNaxsiMessa
         String type = message.contains("NAXSI_FMT")?"fmt":message.contains("NAXSI_EXLOG")?"exlog":"other";
 
         return new NaxsiTuple(type, message);
-    }
-
-    @AllArgsConstructor @Getter
-    public static class NaxsiTuple implements Serializable {
-        private String log;
-        private String message;
     }
 }
 

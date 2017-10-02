@@ -1,30 +1,33 @@
 package com.example.joins;
 
+import com.example.data.tuple.ExtendedLog;
+import com.example.data.tuple.FMTLog;
+import com.example.data.tuple.ParsedLogEntry;
 import com.example.mappers.ParseLogLine;
 import org.apache.flink.api.common.functions.CoGroupFunction;
 import org.apache.flink.util.Collector;
 
-public class SetContentInFindings implements CoGroupFunction<ParseLogLine.ParsedLogEntry, ParseLogLine.ParsedLogEntry, ParseLogLine.FMTLog> {
+public class SetContentInFindings implements CoGroupFunction<ParsedLogEntry, ParsedLogEntry, FMTLog> {
     @Override
-    public void coGroup(Iterable<ParseLogLine.ParsedLogEntry> fmtIterable, Iterable<ParseLogLine.ParsedLogEntry> exlogIterable, Collector<ParseLogLine.FMTLog> collector) throws Exception {
-        for (ParseLogLine.ParsedLogEntry fmt : fmtIterable) {
+    public void coGroup(Iterable<ParsedLogEntry> fmtIterable, Iterable<ParsedLogEntry> exlogIterable, Collector<FMTLog> collector) throws Exception {
+        for (ParsedLogEntry fmt : fmtIterable) {
             if(fmt == null) {
                 continue;
             }
             if (fmt.getRequest().startsWith("GET")) {
                 setFindingsContentsInGET(fmt);
             } else if(fmt.getRequest().startsWith("POST")) {
-                setFindingsContentsInPOST(exlogIterable, (ParseLogLine.FMTLog) fmt);
+                setFindingsContentsInPOST(exlogIterable, (FMTLog) fmt);
             }
 
-            collector.collect((ParseLogLine.FMTLog) fmt);
+            collector.collect((FMTLog) fmt);
         }
     }
 
-    private void setFindingsContentsInPOST(Iterable<ParseLogLine.ParsedLogEntry> exlogIterable, ParseLogLine.FMTLog fmt) {
-        for (ParseLogLine.FMTLog.Finding finding : fmt.getFindings()) {
-            for (ParseLogLine.ParsedLogEntry parsedExlog : exlogIterable) {
-                ParseLogLine.ExtendedLog exlog = ((ParseLogLine.ExtendedLog) parsedExlog);
+    private void setFindingsContentsInPOST(Iterable<ParsedLogEntry> exlogIterable, FMTLog fmt) {
+        for (FMTLog.Finding finding : fmt.getFindings()) {
+            for (ParsedLogEntry parsedExlog : exlogIterable) {
+                ExtendedLog exlog = ((ExtendedLog) parsedExlog);
                 if(exlog == null) {
                     continue;
                 }
@@ -35,18 +38,16 @@ public class SetContentInFindings implements CoGroupFunction<ParseLogLine.Parsed
         }
     }
 
-    private void setFindingsContentsInGET(ParseLogLine.ParsedLogEntry fmt) {
+    private void setFindingsContentsInGET(ParsedLogEntry fmt) {
         String[] variables = fmt.getRequest()
             .substring(fmt.getRequest().indexOf("/?") + 2, fmt.getRequest().lastIndexOf(" "))
             .split("&");
 
         for (String variable : variables) {
             String[] values = variable.split("=");
-            for (ParseLogLine.FMTLog.Finding finding : ((ParseLogLine.FMTLog) fmt).getFindings()) {
-                if (values[0].equals(finding.getVarName())) {
-                    finding.setContent(values[1]);
-                }
-            }
+            ((FMTLog) fmt).getFindings().stream()
+                    .filter(finding -> values[0].equals(finding.getVarName()))
+                    .forEach(finding -> finding.setContent(values[1]));
         }
     }
 }

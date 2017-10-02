@@ -5,12 +5,14 @@ import com.ifountain.opsgenie.client.OpsGenieClient;
 import com.ifountain.opsgenie.client.OpsGenieClientException;
 import com.ifountain.opsgenie.client.model.alert.CreateAlertRequest;
 import com.ifountain.opsgenie.client.model.alert.CreateAlertResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.Collections;
 
+@Slf4j
 public class OpsGenieSink implements SinkFunction<OpsGenieTuple> {
 
     private static OpsGenieClient client;
@@ -27,17 +29,16 @@ public class OpsGenieSink implements SinkFunction<OpsGenieTuple> {
         System.out.println(message);
 
         CreateAlertRequest request = new CreateAlertRequest();
-        request.setApiKey(Settings.get("opsgenie.api.key"));
+        request.setApiKey(Settings.get(Settings.Key.OPSGENIE_API_KEY));
         request.setMessage(message);
         request.setSource("flink");
-        request.setTeams(Collections.singletonList(Settings.get("opsgenie.api.team")));
+        request.setTeams(Collections.singletonList(Settings.get(Settings.Key.OPSGENIE_API_TEAM)));
 
         try {
             CreateAlertResponse response = client.alert().createAlert(request);
             response.getAlertId();
         } catch (OpsGenieClientException | IOException | ParseException e) {
-            System.err.println("Could not create OpsGenie alert");
-            e.printStackTrace();
+           log.error("Could not create OpsGenie alert", e);
         }
     }
 }
